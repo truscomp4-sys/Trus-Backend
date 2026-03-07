@@ -24,8 +24,7 @@ import initAdminDb from './config/initAdminDb';
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 5001;
-
+const PORT = Number(process.env.PORT) || 3000;
 // Rate Limiting for Login
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
@@ -110,8 +109,8 @@ const startServer = async () => {
     // Only listen if NOT in Vercel environment
     if (!process.env.VERCEL) {
         app.listen(PORT, () => {
-            console.log(`Server is running on http://localhost:${PORT}`);
-        });
+    console.log(`Server running on port ${PORT}`);
+});
     }
 };
 
