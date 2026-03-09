@@ -34,10 +34,11 @@ const loginLimiter = rateLimit({
 
 // Middleware
 const allowedOrigins = [
-    'https://truscomp-frontend.vercel.app',
-    'http://localhost:8080',
-    'http://localhost:3000',
-    process.env.CLIENT_URL
+  'https://truscomp.com',
+  'https://www.truscomp.com',
+  'https://truscomp-frontend.vercel.app',
+  'http://localhost:8080',
+  'http://localhost:3000'
 ].filter(Boolean) as string[];
 
 const corsOptions = {
