@@ -36,6 +36,8 @@ const loginLimiter = rateLimit({
 // Middleware
 const allowedOrigins = [
     'https://truscomp-frontend.vercel.app',
+    'https://truscomp.com',
+    'https://www.truscomp.com',
     'http://localhost:8080',
     'http://localhost:3000',
     process.env.CLIENT_URL
@@ -47,7 +49,9 @@ const corsOptions = {
         if (!origin || allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
-            callback(new Error(`CORS not allowed for origin: ${origin}`));
+            console.warn(`CORS blocked for origin: ${origin}`);
+            // Don't throw a hard error to avoid disrupting the request flow
+            callback(null, false);
         }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -104,15 +108,24 @@ app.get('/health', async (req: Request, res: Response) => {
 
 // Start Server
 const startServer = async () => {
-    // Initialize DB schema (add missing columns if needed)
-    await initAdminDb();
-
-    // Only listen if NOT in Vercel environment
-    if (!process.env.VERCEL) {
-        app.listen(PORT, () => {
-            console.log(`Server is running on http://localhost:${PORT}`);
+    // Start listening immediately so Hostinger/Passenger sees the app as ready
+    const server = app.listen(PORT, () => {
+        console.log(`Server is running on http://localhost:${PORT}`);
+        
+        // Initialize DB schema in the background after starting
+        initAdminDb().catch(err => {
+            console.error('Background DB initialization failed:', err);
         });
-    }
+    });
+
+    // Handle process signals for graceful shutdown
+    process.on('SIGTERM', () => {
+        console.log('SIGTERM signal received: closing HTTP server');
+        server.close(() => {
+            console.log('HTTP server closed');
+            pool.end().then(() => console.log('DB pool closed'));
+        });
+    });
 };
 
 startServer();
