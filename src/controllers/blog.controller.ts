@@ -134,6 +134,21 @@ export const upsertBlog = async (req: AuthRequest, res: Response) => {
         return res.status(400).json({ message: 'Title is required' });
     }
 
+    // Clean all forms of non-breaking spaces from incoming content
+    const cleanHTML = (str: any) => {
+        if (typeof str !== 'string') return str;
+        return str
+            .replace(/[\u00a0]/g, ' ')      // Unicode NBSP
+            .replace(/&nbsp;/g, ' ')        // Standard HTML entity
+            .replace(/&amp;nbsp;/g, ' ')    // Double encoded entity
+            .replace(/\s{2,}/g, ' ');       // Collapse multiple spaces to one
+    };
+
+    title = cleanHTML(title);
+    short_description = cleanHTML(short_description);
+    long_description = cleanHTML(long_description);
+    final_thoughts = cleanHTML(final_thoughts);
+
     try {
         // Auto-generate slug if not provided or if it's a new blog
         // This ensures the URL is always clean and unique
