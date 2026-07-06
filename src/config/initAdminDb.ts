@@ -251,6 +251,7 @@ const initAdminDb = async () => {
                 twitter_description TEXT,
                 robots VARCHAR(100) DEFAULT 'index, follow',
                 schema_type VARCHAR(100) DEFAULT 'Organization',
+                schema_json JSONB,
                 status VARCHAR(20) DEFAULT 'published',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -258,6 +259,9 @@ const initAdminDb = async () => {
 
             DROP INDEX IF EXISTS idx_seo_page_unique;
             CREATE UNIQUE INDEX idx_seo_page_unique ON seo_meta (page_type, COALESCE(page_reference_id, ''));
+
+            -- Safe schema updates for seo_meta
+            ALTER TABLE seo_meta ADD COLUMN IF NOT EXISTS schema_json JSONB;
 
             -- 6. Labour Law Updates
             CREATE TABLE IF NOT EXISTS labour_law_updates (

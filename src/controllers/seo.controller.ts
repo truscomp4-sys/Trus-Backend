@@ -41,17 +41,31 @@ export const upsertSEO = async (req: AuthRequest, res: Response) => {
         twitter_description,
         robots,
         schema_type,
+        schema_json,
         status
     } = req.body;
+
+    let parsedSchema = null;
+    if (schema_json) {
+        if (typeof schema_json === 'string') {
+            try {
+                parsedSchema = JSON.parse(schema_json);
+            } catch (e: any) {
+                return res.status(400).json({ message: 'Invalid JSON format for Schema Markup', error: e.message });
+            }
+        } else {
+            parsedSchema = schema_json;
+        }
+    }
 
     try {
         const result = await pool.query(`
             INSERT INTO seo_meta (
                 page_type, page_reference_id, meta_title, meta_description, meta_keywords, 
                 canonical_url, og_title, og_description, og_image, twitter_title, 
-                twitter_description, robots, schema_type, status, updated_at
+                twitter_description, robots, schema_type, schema_json, status, updated_at
             ) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
             ON CONFLICT (page_type, (COALESCE(page_reference_id, ''))) 
             DO UPDATE SET 
                 meta_title = EXCLUDED.meta_title,
@@ -65,13 +79,14 @@ export const upsertSEO = async (req: AuthRequest, res: Response) => {
                 twitter_description = EXCLUDED.twitter_description,
                 robots = EXCLUDED.robots,
                 schema_type = EXCLUDED.schema_type,
+                schema_json = EXCLUDED.schema_json,
                 status = EXCLUDED.status,
                 updated_at = NOW()
             RETURNING *
         `, [
             page_type, page_reference_id || null, meta_title, meta_description, meta_keywords,
             canonical_url, og_title, og_description, og_image, twitter_title,
-            twitter_description, robots, schema_type, status
+            twitter_description, robots, schema_type, parsedSchema, status
         ]);
 
         res.json(result.rows[0]);
