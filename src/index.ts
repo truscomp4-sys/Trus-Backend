@@ -45,8 +45,8 @@ const allowedOrigins = [
 
 const corsOptions = {
     origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-        // Allow requests with no origin (e.g. curl, mobile apps)
-        if (!origin || allowedOrigins.includes(origin)) {
+        // Allow requests with no origin (e.g. curl, mobile apps) or any localhost dev origin
+        if (!origin || allowedOrigins.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
             callback(null, true);
         } else {
             console.warn(`CORS blocked for origin: ${origin}`);

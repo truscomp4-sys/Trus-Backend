@@ -115,9 +115,15 @@ export const submitEnquiry = async (req: Request, res: Response) => {
                     </div>
                 `;
 
-                // 3. Send Email
+                // 3. Send Email to dynamic Admin email
                 await sendEmail(adminEmail, 'New Enquiry Received – TrusComp Website', emailHtml);
                 console.log(`Admin notification email sent to ${adminEmail} for enquiry from ${name}`);
+
+                // 4. Send Email to info@truscomp.com as well
+                if (adminEmail !== 'info@truscomp.com') {
+                    await sendEmail('info@truscomp.com', 'New Enquiry Received – TrusComp Website', emailHtml);
+                    console.log(`Admin notification email sent to info@truscomp.com for enquiry from ${name}`);
+                }
             } catch (emailErr: any) {
                 // Log failure silently as per requirements
                 console.error('Silent failure sending admin notification email:', emailErr.message);
