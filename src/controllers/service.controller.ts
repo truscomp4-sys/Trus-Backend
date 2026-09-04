@@ -66,12 +66,13 @@ export const getServiceBySlug = async (req: Request, res: Response) => {
         const service = serviceResult.rows[0];
         const serviceId = service.id;
 
-        const [problems, features, benefits, whyTrusComp, faqs] = await Promise.all([
+        const [problems, features, benefits, whyTrusComp, faqs, stats] = await Promise.all([
             pool.query('SELECT problem_text FROM service_problems WHERE service_id = $1 ORDER BY sort_order ASC', [serviceId]),
             pool.query('SELECT title, hint FROM service_features WHERE service_id = $1 ORDER BY sort_order ASC', [serviceId]),
             pool.query('SELECT keyword, text FROM service_benefits WHERE service_id = $1 ORDER BY sort_order ASC', [serviceId]),
             pool.query('SELECT point_text FROM service_why_truscomp WHERE service_id = $1 ORDER BY sort_order ASC', [serviceId]),
-            pool.query('SELECT question, answer FROM service_faqs WHERE service_id = $1 ORDER BY sort_order ASC', [serviceId])
+            pool.query('SELECT question, answer FROM service_faqs WHERE service_id = $1 ORDER BY sort_order ASC', [serviceId]),
+            pool.query('SELECT label, value FROM service_stats WHERE service_id = $1 ORDER BY sort_order ASC', [serviceId])
         ]);
 
         res.json({
@@ -80,7 +81,8 @@ export const getServiceBySlug = async (req: Request, res: Response) => {
             features: features.rows,
             benefits: benefits.rows,
             whyTrusComp: whyTrusComp.rows.map(r => r.point_text),
-            faqs: faqs.rows
+            faqs: faqs.rows,
+            stats: stats.rows
         });
     } catch (err) {
         console.error('Error fetching service detail:', err);
@@ -103,7 +105,10 @@ export const upsertService = async (req: AuthRequest, res: Response) => {
             features,
             benefits,
             whyTruscomp, whyTrusComp,
-            faqs
+            faqs,
+            stats,
+            quote, quoteAuthor, quote_author,
+            slug: requestedSlug
         } = req.body;
 
         if (!title) {
@@ -115,8 +120,13 @@ export const upsertService = async (req: AuthRequest, res: Response) => {
             return res.status(400).json({ message: 'Category is required' });
         }
 
-        // 1. Generate Unique Slug
-        const baseSlug = title
+        // 1. Generate Unique Slug.
+        // An explicit slug wins so pages with a fixed URL (e.g. /services/gcc)
+        // keep it when the title is edited in the admin panel.
+        const slugSource = typeof requestedSlug === 'string' && requestedSlug.trim()
+            ? requestedSlug
+            : title;
+        const baseSlug = slugSource
             .toLowerCase()
             .trim()
             .replace(/[^\w\s-]/g, '')     // Remove special chars
@@ -153,14 +163,17 @@ export const upsertService = async (req: AuthRequest, res: Response) => {
             why_truscomp: whyTruscomp ?? whyTrusComp ?? [],
             features: features ?? [],
             benefits: benefits ?? [],
-            faqs: faqs ?? []
+            faqs: faqs ?? [],
+            stats: stats ?? [],
+            quote: quote ?? null,
+            quote_author: quoteAuthor ?? quote_author ?? null
         };
 
         await pool.query('BEGIN');
 
         const serviceResult = await pool.query(`
-            INSERT INTO services (id, slug, title, category, short_overview, long_overview, doodle_type, state, is_visible, sort_order, updated_at)
-            VALUES (COALESCE($1, nextval('services_id_seq')), $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+            INSERT INTO services (id, slug, title, category, short_overview, long_overview, doodle_type, state, is_visible, sort_order, quote, quote_author, updated_at)
+            VALUES (COALESCE($1, nextval('services_id_seq')), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
             ON CONFLICT (id) 
             DO UPDATE SET 
                 slug = EXCLUDED.slug,
@@ -172,12 +185,15 @@ export const upsertService = async (req: AuthRequest, res: Response) => {
                 state = EXCLUDED.state,
                 is_visible = EXCLUDED.is_visible,
                 sort_order = EXCLUDED.sort_order,
+                quote = EXCLUDED.quote,
+                quote_author = EXCLUDED.quote_author,
                 updated_at = NOW()
             RETURNING id
         `, [
             data.id, data.slug, data.title, data.category,
             data.short_overview, data.long_overview,
-            data.doodle_type, data.state, data.is_visible, data.sort_order
+            data.doodle_type, data.state, data.is_visible, data.sort_order,
+            data.quote, data.quote_author
         ]);
 
         const serviceId = serviceResult.rows[0].id;
@@ -188,6 +204,7 @@ export const upsertService = async (req: AuthRequest, res: Response) => {
         await pool.query('DELETE FROM service_benefits WHERE service_id = $1', [serviceId]);
         await pool.query('DELETE FROM service_why_truscomp WHERE service_id = $1', [serviceId]);
         await pool.query('DELETE FROM service_faqs WHERE service_id = $1', [serviceId]);
+        await pool.query('DELETE FROM service_stats WHERE service_id = $1', [serviceId]);
 
         if (Array.isArray(data.common_problems)) {
             for (let i = 0; i < data.common_problems.length; i++) {
@@ -222,6 +239,15 @@ export const upsertService = async (req: AuthRequest, res: Response) => {
                 const q = data.faqs[i];
                 if (q.question && q.answer) {
                     await pool.query('INSERT INTO service_faqs (service_id, question, answer, sort_order) VALUES ($1, $2, $3, $4)', [serviceId, q.question, q.answer, i]);
+                }
+            }
+        }
+
+        if (Array.isArray(data.stats)) {
+            for (let i = 0; i < data.stats.length; i++) {
+                const st = data.stats[i];
+                if (st.label && st.value) {
+                    await pool.query('INSERT INTO service_stats (service_id, label, value, sort_order) VALUES ($1, $2, $3, $4)', [serviceId, st.label, st.value, i]);
                 }
             }
         }
