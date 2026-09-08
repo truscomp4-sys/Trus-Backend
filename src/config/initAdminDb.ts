@@ -99,8 +99,18 @@ const initAdminDb = async () => {
                 sort_order INTEGER DEFAULT 0
             );
 
+            CREATE TABLE IF NOT EXISTS service_stats (
+                id SERIAL PRIMARY KEY,
+                service_id INTEGER REFERENCES services(id) ON DELETE CASCADE,
+                label VARCHAR(255) NOT NULL,
+                value VARCHAR(100) NOT NULL,
+                sort_order INTEGER DEFAULT 0
+            );
+
             ALTER TABLE services ADD COLUMN IF NOT EXISTS is_visible BOOLEAN DEFAULT TRUE;
             ALTER TABLE services ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;
+            ALTER TABLE services ADD COLUMN IF NOT EXISTS quote TEXT;
+            ALTER TABLE services ADD COLUMN IF NOT EXISTS quote_author VARCHAR(255);
         `);
 
         // 2. Resources & Compliance
